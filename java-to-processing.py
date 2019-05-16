@@ -16,7 +16,11 @@ def usage():
     quit()
 
 if (len(sys.argv) < 3):
-    usage()
+    if ("--version" in sys.argv):
+        print("[Version] 2.0.0")
+        sys.exit()
+    else:
+        usage()
 
 def getJavaFiles(sourceFolder):
     javaFiles = []
@@ -180,9 +184,6 @@ def main():
             overwrite = True
         elif opt in ("--noformat"):
             formatCode = False
-        elif opt in ("--version"):
-            print("[Version] 1.0.0")
-            sys.exit()
         elif opt in ("-v", "--verbose"):
             verbose = True
 
