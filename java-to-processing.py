@@ -12,12 +12,12 @@ def usage():
             "                     use if it produces weirdly formatted code")
     print("    -h  --help         this cruft")
     print("        --version      displays the version of this script")
-    print("    -v  --verbose      enable verbose logging")
-    quit()
+    #print("    -v  --verbose      enable verbose logging")
+    sys.exit()
 
 if (len(sys.argv) < 3):
     if ("--version" in sys.argv):
-        print("[Version] 2.0.0")
+        print("[Version] 2.5.0")
         sys.exit()
     else:
         usage()
@@ -36,7 +36,7 @@ def getDataFolder(sourceFolder):
     for (root, dirs, files) in os.walk(sourceFolder):
         ### LOCATE DATA DIRECTORY ###
         for name in dirs:
-            if (name=="data"):
+            if (name=="data" and "src" in root):
                 return os.path.join(root, name)
     return None
 
@@ -59,14 +59,14 @@ def copyDataFolder(dataFolder, destFolder, overwrite):
             print('Directory not copied. Error: %s' % e)
 
 ### PARSING METHODS ###
-def findEndBracket(lines, start, list):
+def findEndBracket(lines, start):
     openBrackets = 0
     for x in range(start, len(lines)):
         line = lines[x].replace(" ", "")
 
         if (line.find("{", len(line)-2) > -1):
             openBrackets += 1
-        elif (line.find("}", 0, 1) > -1):
+        if (line.find("}", 0, 1) > -1):
             openBrackets -= 1
             if (openBrackets==0):
                 return x
@@ -112,59 +112,58 @@ def parseGeneric(lines):
         
     return _lines
 
-def parseMain():
-    pass
-    ### SPECIAL CASE FOR MAIN METHOD ###
-        
-    ### CHECK IF DIRECTORY IS NAMED CORRECTLY
-    # fileName = os.path.splitext(name)[0]
-    # if (os.path.split(destFolder)[-1]!=fileName):
-    #     destFolder += "/" + fileName
+def formatMainMethod(line):
+    if (line.find("    ", 0, 4) > -1):
+        if (not line=="\n"):
+            line = line[4:-1] # Remove 4 spaces from the beginning of line, to account for removal of main class
+            line += "\n"
+    return line
 
+def isClassHeader(line):
+    line = line.replace(" ", "")
+    if (line.find("extendsPApplet{", len(line)-16) > -1):
+        return True
+    return False
 
-    ### REMOVE MAIN CLASS HEADER/FOOTER, ATTEMPT FORMATTING ###
-    # for x in range(len(lines)):
-    #     if (x >= len(lines)): break
+def isJavaMainFunction(line):
+    line = line.replace(" ", "")
+    if (line.find("publicstaticvoidmain(String", 0, 28) > -1):
+        return True
+    return False
 
-    #     line = lines[x]
-
-    #     if (formatCode):
-    #         if (line.find("    ", 0, 4) > -1):
-    #             if (not line=="\n"):
-    #                 lines[x] = line[4:-1] # Remove 4 spaces from the beginning of line, to account for removal of main class
-    #                 lines[x] += "\n"
-                    
-        
-
-    #     line = line.replace(" ", "")
-    #     if (line.find("extendsPApplet{", len(line)-16) > -1):
-    #         ### FIND CLOSING BRACKET OF MAIN CLASS ###
-    #         y = findEndBracket(x, lines)
-    #         # print("x: %s, y: %s" % (x,y))
-    #         # print(lines[x])
-    #         # print(lines[y])
-    #         del lines[y] # remove closing bracket header line    
-    #         del lines[x] # remove beginning header line
-
-    # ### REMOVE JAVA MAIN FUNCTION ###
-    # for x in range(len(lines)):
-    #     if (x >= len(lines)): break
-
-    #     line = lines[x].replace(" ", "")
-    #     if (line.find("publicstaticvoidmain(String", 0, 28) > -1):
-    #         #del lines[x] # remove beginning header line
+def parseMainMethod(lines):
+    removeIndexes = []
+    for idx, line in enumerate(lines):
+        if (formatCode): 
+            lines[idx] = formatMainMethod(line)
+        if (isClassHeader(line)):
+            removeIndexes.append(idx)
+            y = findEndBracket(lines, idx)
+            removeIndexes.append(y)
+        elif (isJavaMainFunction(line)):
+            y = findEndBracket(lines, idx)
             
-    #         ### FIND CLOSING BRACKET OF MAIN CLASS ###
-    #         y = findEndBracket(x, lines)
-    #         #print("x: %s, y: %s" % (x,y+1))
-    #         #print(lines[x:y+1])
-    #         del lines[x:y+1]
+            #print(list(range(idx,y+1)))
+            #print([lines[x] for x in range(idx,y+1)])
+            removeIndexes.extend(range(idx,y+1))
+            
+    
+    # Return array minus the remove indexes
+    _lines = []
+    removeIndexes = set(removeIndexes)
 
+    for idx, line in enumerate(lines):
+        if (idx not in removeIndexes):
+            _lines.append(line)
         
+    return _lines
+
+formatCode = True
+
 def main():
+    global formatCode
     ### Script Vars ###
     overwrite = False
-    formatCode = True
     verbose = False
 
     sourceFolder = sys.argv[1]
@@ -208,21 +207,24 @@ def main():
     if (answer.lower()!="y"): quit()
     
     if (dataFolder != None): copyDataFolder(dataFolder, destFolder, overwrite)
-    if (not os.path.exists(dataFolder)): 
+
+    # Create folder for main method
+    if (not os.path.exists(destFolder)): 
         os.makedirs(destFolder)
 
     for file, name in javaFiles:
         file = open(file, "r")
         lines = file.readlines()
 
-        # if (isMainMethod(lines)): 
-        #     print("[Main Method] %s" % name)
+        if (name == mainMethod):
+            print("Parsing Main Method")
+            lines = parseMainMethod(lines)
         
         lines = parseGeneric(lines)
 
-        for line in lines:
+        #for line in lines:
             #print(line, end='')
-            pass
+        #    pass
 
         ### Write Output File ###
 
